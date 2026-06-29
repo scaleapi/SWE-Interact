@@ -1,0 +1,32 @@
+# Merged on top of Harbor's base docker-compose config.
+# Adds the user-simulator sidecar. The sidecar holds the latent user goal and
+# keeps its conversation state across task steps.
+services:
+  main:
+    entrypoint: []
+    command: ["/bin/bash", "-lc", "python3 /usr/local/bin/repo_exec_server.py & sleep infinity"]
+    depends_on:
+      user-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8765),timeout=2); s.close()"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+  user-server:
+    build:
+      context: ./user-server
+    environment:
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL}
+      - SIM_USER_MODEL=${SIM_USER_MODEL:-}
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('localhost',8000),timeout=2); s.close()"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
