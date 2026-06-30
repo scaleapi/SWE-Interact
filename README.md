@@ -1,8 +1,8 @@
-# SWE Interact
+# SWE-Interact
 
 [![arXiv](https://img.shields.io/badge/arXiv-2606.30573-b31b1b.svg)](https://arxiv.org/abs/2606.30573)
 
-SWE Interact is a benchmark of 75 tasks for evaluating coding agents on multi-turn software engineering tasks in a realistic user-driven development setting. The repository contains the task data and example Harbor run configs needed to run the tasks.
+SWE-Interact is a benchmark of 75 tasks for evaluating coding agents on multi-turn software engineering tasks in a realistic user-driven development setting. The repository contains the task data and example Harbor run configs needed to run the tasks.
 
 ## Repository Layout
 
@@ -84,7 +84,7 @@ The scripts write outputs under `results/`. To make a custom config, copy an exi
 
 ## Citation
 
-If you use SWE-INTERACT in your research, please cite our paper:
+If you use SWE-Interact in your research, please cite our paper:
 
 ```bibtex
 @misc{raghavendra2026sweinteractreimaginingswebenchmarks,
